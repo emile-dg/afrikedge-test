@@ -3,7 +3,7 @@ import {SalesOrdersServices} from "./sales_orders.services";
 import {salesOrderQuerySchema, TSalesOrderQuery} from "./sales_orders.query";
 import {ZodValidationPipe} from "../common/pipes/zod-validation.pipe";
 import {paginationQuerySchema} from "../common/schema/pagination.schema";
-import {PaginationQuery} from "@shared/types";
+import {PaginatedResponse, PaginationQuery} from "@shared/types";
 import {SalesOrderStatus} from "./sales_orders.types";
 import {TSalesOrder} from "@shared/types";
 
@@ -15,15 +15,15 @@ export class SalesOrdersController {
     }
 
     @Get()
-    async getSalesOrders(@Query(new ZodValidationPipe(salesOrderQuerySchema)) query: TSalesOrderQuery,): Promise<TSalesOrder[]> {
+    async getSalesOrders(@Query(new ZodValidationPipe(salesOrderQuerySchema)) query: TSalesOrderQuery,): Promise<PaginatedResponse<TSalesOrder>> {
         return this.salesOrdersService.getSalesOrders(
-            query.status ? {status: query.status} : {},
+            query.status !== undefined ? {status: query.status} : {},
             {page: query.page, limit: query.limit},
         );
     }
 
     @Get('to-plan')
-    async getPlannedSalesOrders(@Query(new ZodValidationPipe(paginationQuerySchema)) query: PaginationQuery) {
+    async getPlannedSalesOrders(@Query(new ZodValidationPipe(paginationQuerySchema)) query: PaginationQuery): Promise<PaginatedResponse<TSalesOrder>> {
         return this.salesOrdersService.getSalesOrders(
             {status: SalesOrderStatus.Pending},
             {page: query.page, limit: query.limit},
