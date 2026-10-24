@@ -3,6 +3,7 @@ import {ConfigModule} from '@nestjs/config';
 import {z} from 'zod';
 import {VehiclesModule} from './vehicles/vehicles.module';
 import { SalesOrdersModule } from './sales_orders/sales_orders.module';
+import { TransportOrdersModule } from './transport-orders/transport-orders.module';
 
 const schema = z.object({
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -21,6 +22,7 @@ const schema = z.object({
         ConfigModule.forRoot({isGlobal: true, validationSchema: schema}),
         VehiclesModule,
         SalesOrdersModule,
+        TransportOrdersModule,
     ]
 })
 export class AppModule {
