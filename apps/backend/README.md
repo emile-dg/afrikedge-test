@@ -13,6 +13,14 @@ Initialize an empty assessment database using the instructions in docker-compose
 
 The API defaults to http://localhost:3000. Configure PORT, CORS_ORIGIN, and DB_* settings in apps/backend/.env. Environment values are validated at startup; the pool closes on shutdown.
 
+## Swagger documentation
+
+Start the backend and open http://localhost:3000/docs for the generated Swagger UI. The OpenAPI document is available at /docs-json and /docs-yaml. These paths use the configured backend port and do not change the existing API route paths.
+
+Click **Authorize** and enter `diane` or `eric` to send the `X-User-Id` header with requests. Swagger documents the existing role restrictions; only Eric can validate transports. Documentation is accessible without a user header, while feature requests retain their authorization guard.
+
+Routes are discovered automatically by Nest Swagger. Request bodies and query parameters are generated from the existing Zod schemas; response schemas describe the shared pagination and backend contracts. Custom Zod refinements and business rules remain enforced by the API.
+
 ## Simulated identity and permissions
 
 Every feature request requires X-User-Id. This is an assessment identity simulation, not real authentication.
