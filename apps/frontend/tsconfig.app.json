@@ -13,6 +13,7 @@
         "noUncheckedIndexedAccess": true,
         // Path mapping for cleaner imports.
         "paths": {
+            "@shared/*": ["../../shared/*"],
             "@/*": [
                 "./src/*"
             ]

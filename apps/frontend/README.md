@@ -1,45 +1,45 @@
-# .
+# AfrikEdge frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+Vue 3, Tailwind CSS, Vue Router, and Pinia. The interface is in French.
 
-## Recommended IDE Setup
+## Run and verify
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
-(and disable Vetur).
+    pnpm --filter frontend dev
+    pnpm --filter frontend build
+    pnpm --filter frontend test
 
-## Recommended Browser Setup
+The build includes Vue/TypeScript checking. Tests cover the fake data source and stores without a browser or backend.
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-    - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-    - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-    - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-    - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## Pages
 
-## Type Support for `.vue` Imports in TS
+- Accueil: planning counts, recent transports, and creation shortcuts.
+- Commandes à planifier: city filter, pagination, selection across pages, and assignment to an existing or new Draft transport.
+- Ordres de transport: status/date filters, pagination, creation, and detail links.
+- Détail du transport: assigned orders, capacity gauge, addition/removal, validation, and departure.
+- Véhicules: active vehicles and their capacities.
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for
-type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the
-TypeScript language service aware of `.vue` types.
+The sidebar uses normal flex/document flow. The mobile menu expands above the page. Wide tables scroll inside their containers.
 
-## Customize configuration
+## Demo identity and data
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+The header selects Diane (Dispatcher) or Eric (Responsable logistique). Only Eric can validate. Both can plan transports, edit Draft assignments, and mark Validated transports as departed.
 
-## Project Setup
+Only the selected ID is stored in localStorage under afrikedge.current-user. Invalid or unavailable storage falls back to Diane. Business data is in memory: route changes and user changes preserve it, while a full refresh restores the assessment seed dataset and recalculates its dates relative to today in Africa/Douala.
 
-```sh
-pnpm install
-```
+The dataset mirrors init.sql: ten vehicles including one inactive vehicle, forty sales orders, four transports, and their assignments. The adapter returns only active vehicles, camelCase records, numeric weights, date-only strings, and paginated responses.
 
-### Compile and Hot-Reload for Development
+## Data boundary
 
-```sh
-pnpm dev
-```
+    Page → Pinia action → PlanningApi → fake dataset
 
-### Type-Check, Compile and Minify for Production
+The integration entry point is src/data/api.ts. Replace its planningApi implementation with an HTTP adapter conforming to src/data/contracts.ts. Views and components do not import fixtures or make network requests.
 
-```sh
-pnpm build
-```
+The fake implementation in src/data/fake-api.ts checks roles, scheduling, Draft-only edits, assignment uniqueness, atomic batches, capacity, sales-status synchronization, validation, and departure. Reads return detached records and have a short artificial delay.
+
+City filtering and city options are frontend adapter conveniences. The current backend has no city filter, so a future HTTP adapter must derive these from all Unplanned pages or use a separately extended backend contract. Apply city filtering before frontend pagination. The existing Draft-picker helper already traverses every transport page.
+
+Creation followed by assignment uses two operations. When creation succeeds but assignment fails, the dialog retains the new empty Draft as its destination for retry. No backend or database changes are included.
+
+## Components
+
+UiButton, UiInput, UiSelect, UiCard, UiBadge, UiTable, UiPagination, UiDialog, UiAlert, and CapacityGauge supply the basic styling and accessible states. SalesSelection and TransportFields reuse workflow-specific controls across pages and dialogs.

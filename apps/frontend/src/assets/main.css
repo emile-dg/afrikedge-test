@@ -1,0 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+    --font-sans: "Sora", sans-serif;
+}
+
+@layer base {
+    body {
+        @apply m-0 bg-slate-50 font-sans text-slate-900 antialiased;
+    }
+
+    button, a {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    button {
+        @apply cursor-pointer;
+    }
+
+    :focus-visible {
+        @apply outline-2 outline-offset-4 outline-emerald-600;
+    }
+}
