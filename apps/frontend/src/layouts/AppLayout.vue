@@ -20,9 +20,9 @@ watch(() => route.fullPath, () => { sidebarOpen.value = false })
 </script>
 
 <template>
-    <div class="flex min-h-dvh flex-col lg:flex-row" @keydown.esc="sidebarOpen = false">
+    <div class="flex h-dvh flex-col overflow-hidden lg:flex-row" @keydown.esc="sidebarOpen = false">
         <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3">Aller au contenu</a>
-        <div class="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3 lg:hidden">
+        <div class="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-3 lg:hidden">
             <RouterLink to="/" class="font-semibold tracking-tight text-emerald-800">AfrikEdge</RouterLink>
             <UiButton variant="ghost" size="sm" aria-controls="app-sidebar" :aria-expanded="sidebarOpen" @click="sidebarOpen = !sidebarOpen">
                 {{ sidebarOpen ? 'Fermer' : 'Menu' }}
@@ -30,8 +30,8 @@ watch(() => route.fullPath, () => { sidebarOpen.value = false })
             </UiButton>
         </div>
 
-        <aside id="app-sidebar" class="w-full shrink-0 flex-col border-b border-slate-200 bg-white lg:w-64 lg:border-r lg:border-b-0" :class="sidebarOpen ? 'flex' : 'hidden lg:flex'">
-            <RouterLink to="/" class="hidden min-h-24 items-center gap-3 border-b border-slate-100 px-6 lg:flex">
+        <aside id="app-sidebar" class="max-h-[40dvh] w-full shrink-0 flex-col overflow-y-auto border-b border-slate-200 bg-white lg:h-full lg:max-h-none lg:w-64 lg:border-r lg:border-b-0" :class="sidebarOpen ? 'flex' : 'hidden lg:flex'">
+            <RouterLink to="/" class="hidden min-h-24 shrink-0 items-center gap-3 border-b border-slate-100 px-6 lg:flex">
                 <span class="flex size-10 items-center justify-center rounded-xl bg-emerald-700 text-sm font-bold text-white">AE</span>
                 <span><span class="block font-semibold tracking-tight">AfrikEdge</span><span class="mt-1 block text-[11px] text-slate-400">Planification des transports</span></span>
             </RouterLink>
@@ -54,16 +54,16 @@ watch(() => route.fullPath, () => { sidebarOpen.value = false })
             </div>
         </aside>
 
-        <div class="min-w-0 flex-1">
-            <header class="flex min-h-24 flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
+        <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+            <header class="flex min-h-24 shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
                 <div class="min-w-0">
                     <p class="text-sm font-semibold">{{ route.meta.title }}</p>
                     <p class="mt-1 text-[11px] text-slate-400">Planification des transports</p>
                 </div>
                 <UiSelect class="w-full sm:w-64" label="Utilisateur" :model-value="user.selectedId" :options="options" @update:model-value="user.selectUser" />
             </header>
-            <main id="main-content" class="mx-auto w-full max-w-7xl min-w-0 px-4 py-7 sm:px-8 sm:py-9" tabindex="-1">
-                <RouterView />
+            <main id="main-content" class="min-h-0 min-w-0 flex-1 overflow-y-auto" tabindex="-1">
+                <div class="mx-auto w-full max-w-7xl min-w-0 px-4 py-7 sm:px-8 sm:py-9"><RouterView /></div>
             </main>
         </div>
     </div>

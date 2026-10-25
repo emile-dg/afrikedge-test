@@ -1,45 +1,46 @@
 # AfrikEdge frontend
 
-Vue 3, Tailwind CSS, Vue Router, and Pinia. The interface is in French.
+Vue 3, Tailwind CSS, Vue Router and Pinia. All business data comes from the NestJS backend.
 
-## Run and verify
+## Development
+
+Start the existing backend on http://localhost:3000, then run:
 
     pnpm --filter frontend dev
+
+The Vite development server forwards /api requests to http://localhost:3000, removing the /api prefix. Copy .env.example to .env only if you need to override the default:
+
+    VITE_API_BASE_URL=/api
+
+For deployment, configure a reverse proxy for /api or set VITE_API_BASE_URL to the backend origin before building. A direct cross-origin URL requires the backend's existing CORS_ORIGIN setting to match the frontend origin. Vite's development proxy is not part of the production build.
+
     pnpm --filter frontend build
-    pnpm --filter frontend test
+    pnpm --filter frontend type-check
 
-The build includes Vue/TypeScript checking. Tests cover the fake data source and stores without a browser or backend.
+No frontend test suite is included in this integration.
 
-## Pages
+## Identity
 
-- Accueil: planning counts, recent transports, and creation shortcuts.
-- Commandes à planifier: city filter, pagination, selection across pages, and assignment to an existing or new Draft transport.
-- Ordres de transport: status/date filters, pagination, creation, and detail links.
-- Détail du transport: assigned orders, capacity gauge, addition/removal, validation, and departure.
-- Véhicules: active vehicles and their capacities.
+The header selects Diane (Dispatcher) or Eric (Responsable logistique), matching the backend's simulated identity registry. Only the selected ID is persisted in localStorage. The useAPI composable captures that ID in X-User-Id for every request. There are no tokens or sessions.
 
-The sidebar uses normal flex/document flow. The mobile menu expands above the page. Wide tables scroll inside their containers.
+Business records are loaded from the backend on refresh and are never initialized from frontend fixtures. Backend changes persist according to the database, independently of browser refresh.
 
-## Demo identity and data
+## Requests and stores
 
-The header selects Diane (Dispatcher) or Eric (Responsable logistique). Only Eric can validate. Both can plan transports, edit Draft assignments, and mark Validated transports as departed.
+Each data store instantiates useAPI. Every network action issues exactly one request for one task. Filter changes and other local state actions issue no requests.
 
-Only the selected ID is stored in localStorage under afrikedge.current-user. Invalid or unavailable storage falls back to Diane. Business data is in memory: route changes and user changes preserve it, while a full refresh restores the assessment seed dataset and recalculates its dates relative to today in Africa/Douala.
+useAPI uses native fetch, serializes query parameters while retaining status 0, encodes JSON bodies, handles 204 responses, and exposes safe ApiError values with status, message, and validation fields. No fake fallback, artificial delay, request retry, or synthetic API method is used.
 
-The dataset mirrors init.sql: ten vehicles including one inactive vehicle, forty sales orders, four transports, and their assignments. The adapter returns only active vehicles, camelCase records, numeric weights, date-only strings, and paginated responses.
+Page composables coordinate multi-request workflows:
 
-## Data boundary
+- useSalesPlanning collects all Unplanned pages through the sales store, then the store derives city options, city filtering, and local pagination. The current backend has no city-filter endpoint; city is never sent as a backend query parameter.
+- useDraftPicker collects Draft summary pages and requests capacity details only for the selected transport.
+- useOverview coordinates individual count requests and transport pages, publishing summary data only after the complete load.
+- useTransportActions coordinates mutations and synchronous cache invalidation. Removal explicitly requests updated details after its successful 204 response. A refresh failure does not turn a successful write into a failed mutation.
+- useAssignment coordinates separate creation and assignment requests. A successfully created Draft remains selected when assignment fails, so retry does not create another transport.
 
-    Page → Pinia action → PlanningApi → fake dataset
+Mutations use returned details directly when available. Unmounted pages reload when visited; stores do not silently cascade requests after mutations. Mounted sales tables refresh explicitly after assignment. Loading, errors, missing records, confirmation dialogs, role controls, and stale-read protection remain in place.
 
-The integration entry point is src/data/api.ts. Replace its planningApi implementation with an HTTP adapter conforming to src/data/contracts.ts. Views and components do not import fixtures or make network requests.
+## Layout
 
-The fake implementation in src/data/fake-api.ts checks roles, scheduling, Draft-only edits, assignment uniqueness, atomic batches, capacity, sales-status synchronization, validation, and departure. Reads return detached records and have a short artificial delay.
-
-City filtering and city options are frontend adapter conveniences. The current backend has no city filter, so a future HTTP adapter must derive these from all Unplanned pages or use a separately extended backend contract. Apply city filtering before frontend pagination. The existing Draft-picker helper already traverses every transport page.
-
-Creation followed by assignment uses two operations. When creation succeeds but assignment fails, the dialog retains the new empty Draft as its destination for retry. No backend or database changes are included.
-
-## Components
-
-UiButton, UiInput, UiSelect, UiCard, UiBadge, UiTable, UiPagination, UiDialog, UiAlert, and CapacityGauge supply the basic styling and accessible states. SalesSelection and TransportFields reuse workflow-specific controls across pages and dialogs.
+The app uses a viewport-height flex shell. The sidebar and header remain stationary while main content scrolls independently. The sidebar is not fixed-positioned. On mobile, navigation expands in normal flow with its own constrained scrolling. Tables and dialogs retain their own overflow containers.

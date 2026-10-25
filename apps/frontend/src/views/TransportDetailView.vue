@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import {computed, onUnmounted, ref, watch} from 'vue'
+import {computed, ref, watch} from 'vue'
 import {RouterLink, useRoute} from 'vue-router'
+import {useTransportActions} from '@/composables/useTransportActions'
+import {useTransportDetail} from '@/composables/useTransportDetail'
 import {useTransportOrdersStore} from '@/stores/transport-orders'
 import {useCurrentUserStore} from '@/stores/current-user'
 import {formatDate, weight} from '@/utils/format'
@@ -17,6 +19,9 @@ const route = useRoute()
 const transports = useTransportOrdersStore()
 const user = useCurrentUserStore()
 const no = computed(() => String(route.params.no))
+const {reload} = useTransportDetail(no)
+const actions = useTransportActions()
+const working = computed(() => transports.pending || actions.busy.value)
 const detail = computed(() => transports.detail)
 const addOpen = ref(false)
 const confirmationOpen = ref(false)
@@ -47,20 +52,18 @@ function ask(kind: 'remove' | 'validate' | 'depart', order = '') {
 }
 async function confirm() {
     if (!canConfirm.value) return
-    const result = action.value === 'remove' ? await transports.removeLine(no.value, salesOrderNo.value) :
-        action.value === 'validate' ? await transports.validate(no.value) : await transports.depart(no.value)
+    const result = action.value === 'remove' ? await actions.removeLine(no.value, salesOrderNo.value) :
+        action.value === 'validate' ? await actions.validate(no.value) : await actions.depart(no.value)
     if (result) {
         confirmationOpen.value = false
         success.value = action.value === 'remove' ? 'La commande a été retirée.' : action.value === 'validate' ? 'Le transport a été validé.' : 'Le transport est parti.'
     }
 }
-watch(no, (value) => {
+watch(no, () => {
     success.value = ''
     confirmationOpen.value = false
     addOpen.value = false
-    void transports.loadDetail(value)
 }, {immediate: true})
-onUnmounted(transports.releaseDetail)
 </script>
 
 <template>
@@ -69,9 +72,10 @@ onUnmounted(transports.releaseDetail)
         <div v-if="transports.detailLoading && !detail" role="status" class="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">Chargement du transport…</div>
         <UiAlert v-else-if="transports.detailError">
             {{ transports.missing ? 'Cet ordre de transport est introuvable.' : transports.detailError }}
-            <UiButton v-if="!transports.missing" size="sm" variant="ghost" @click="transports.loadDetail(no)">Réessayer</UiButton>
+            <UiButton v-if="!transports.missing" size="sm" variant="ghost" @click="reload">Réessayer</UiButton>
         </UiAlert>
-        <template v-else-if="detail">
+        <UiAlert v-if="success" kind="success">{{ success }}</UiAlert>
+        <template v-if="detail && !transports.detailError">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <div class="flex flex-wrap items-center gap-3">
@@ -80,12 +84,11 @@ onUnmounted(transports.releaseDetail)
                     <p class="mt-2 text-sm text-slate-500">Livraison le {{ formatDate(detail.deliveryDate) }}</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <UiButton v-if="detail.status === 0 && user.can('transport-orders:lines:add')" variant="secondary" :disabled="transports.pending" @click="addOpen = true">Ajouter des commandes</UiButton>
-                    <UiButton v-if="detail.status === 0 && user.can('transport-orders:validate')" :disabled="!detail.salesOrders.length || transports.pending" @click="ask('validate')">Valider le transport</UiButton>
-                    <UiButton v-if="detail.status === 1 && user.can('transport-orders:depart')" :disabled="transports.pending" @click="ask('depart')">Marquer comme parti</UiButton>
+                    <UiButton v-if="detail.status === 0 && user.can('transport-orders:lines:add')" variant="secondary" :disabled="working" @click="addOpen = true">Ajouter des commandes</UiButton>
+                    <UiButton v-if="detail.status === 0 && user.can('transport-orders:validate')" :disabled="!detail.salesOrders.length || working" @click="ask('validate')">Valider le transport</UiButton>
+                    <UiButton v-if="detail.status === 1 && user.can('transport-orders:depart')" :disabled="working" @click="ask('depart')">Marquer comme parti</UiButton>
                 </div>
             </div>
-            <UiAlert v-if="success" kind="success">{{ success }}</UiAlert>
             <div class="grid min-w-0 gap-5 xl:grid-cols-2">
                 <UiCard>
                     <template #header><h2 class="text-sm font-semibold">Véhicule & livraison</h2></template>
@@ -105,19 +108,19 @@ onUnmounted(transports.releaseDetail)
                     <template #cell-customerName="{row}"><span class="block whitespace-nowrap">{{ row.customerName }}</span><span class="mt-1 block text-xs text-slate-400">{{ row.customerNo }}</span></template>
                     <template #cell-totalWeightKg="{row}">{{ weight(row.totalWeightKg) }}</template>
                     <template #cell-status="{row}"><UiBadge kind="sales" :status="row.status" /></template>
-                    <template #cell-actions="{row}"><UiButton variant="danger" size="sm" :disabled="transports.pending" :aria-label="'Retirer ' + row.no" @click="ask('remove', row.no)">Retirer</UiButton></template>
+                    <template #cell-actions="{row}"><UiButton variant="danger" size="sm" :disabled="working" :aria-label="'Retirer ' + row.no" @click="ask('remove', row.no)">Retirer</UiButton></template>
                 </UiTable>
             </UiCard>
             <p v-if="detail.status !== 0" class="text-xs text-slate-400">Les commandes ne peuvent plus être modifiées après validation.</p>
             <p v-else-if="!user.can('transport-orders:validate')" class="text-xs text-slate-400">La validation est réservée au responsable logistique.</p>
             <AddOrdersDialog v-model="addOpen" :transport="detail" @added="success = 'Les commandes ont été ajoutées.'" />
         </template>
-        <UiDialog v-model="confirmationOpen" :title="confirmTitle" :busy="transports.pending">
+        <UiDialog v-model="confirmationOpen" :title="confirmTitle" :busy="working">
             <p class="text-sm leading-6 text-slate-600">{{ confirmText }}</p>
             <UiAlert v-if="transports.mutationError">{{ transports.mutationError }}</UiAlert>
             <template #footer>
-                <UiButton variant="secondary" :disabled="transports.pending" @click="confirmationOpen = false">Annuler</UiButton>
-                <UiButton :variant="action === 'remove' ? 'danger' : 'primary'" :loading="transports.pending" :disabled="!canConfirm" @click="confirm">Confirmer</UiButton>
+                <UiButton variant="secondary" :disabled="working" @click="confirmationOpen = false">Annuler</UiButton>
+                <UiButton :variant="action === 'remove' ? 'danger' : 'primary'" :loading="working" :disabled="!canConfirm" @click="confirm">Confirmer</UiButton>
             </template>
         </UiDialog>
     </div>

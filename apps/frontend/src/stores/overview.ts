@@ -1,47 +1,42 @@
-import {ref, watch} from 'vue'
+import {computed, ref} from 'vue'
 import {defineStore} from 'pinia'
-import {planningApi} from '../data/api'
-import type {Status, TransportSummary} from '../data/contracts'
-import {errorMessage} from '../utils/format'
-import {useCurrentUserStore} from './current-user'
-import {dataRevision} from './refresh'
+import {useAPI} from '@/composables/useAPI'
+import type {PaginatedResponse, Status, TransportSummary, TSalesOrder} from '@/data/contracts'
+import {errorMessage} from '@/utils/format'
 
 export const useOverviewStore = defineStore('overview', () => {
-    const user = useCurrentUserStore()
+    const api = useAPI()
     const unplanned = ref(0)
     const counts = ref([0, 0, 0])
     const recent = ref<TransportSummary[]>([])
-    const loading = ref(false)
+    const batchLoading = ref(false)
+    const requests = ref(0)
+    const loading = computed(() => batchLoading.value || requests.value > 0)
     const error = ref('')
-    let requestId = 0
-    let loaded = false
-    async function load() {
-        const id = ++requestId
-        loaded = true
-        loading.value = true
-        error.value = ''
-        const identity = user.selectedId
-        try {
-            const [sales, ...statuses] = await Promise.all([
-                planningApi.listSalesOrders({page: 1, limit: 1, status: 0}, identity),
-                ...([0, 1, 2] as Status[]).map(status => planningApi.listTransportOrders({page: 1, limit: 1, status}, identity)),
-            ])
-            const transports: TransportSummary[] = []
-            let page = 1
-            while (true) {
-                const result = await planningApi.listTransportOrders({page, limit: 100}, identity)
-                transports.push(...result.data)
-                if (page >= result.totalPages) break
-                page++
-            }
-            if (id !== requestId) return
-            unplanned.value = sales.total
-            counts.value = statuses.map(result => result.total)
-            recent.value = transports.sort((a, b) => Number(b.no.slice(3)) - Number(a.no.slice(3))).slice(0, 5)
-        } catch (cause) {
-            if (id === requestId) error.value = errorMessage(cause)
-        } finally { if (id === requestId) loading.value = false }
+    const dirty = ref(true)
+
+    async function task<T>(action: () => Promise<T>): Promise<T> {
+        requests.value++
+        try { return await action() } finally { requests.value-- }
     }
-    watch(dataRevision, () => { if (loaded) void load() })
-    return {unplanned, counts, recent, loading, error, load}
+    const fetchUnplannedCount = (signal?: AbortSignal) => task(async () =>
+        (await api.request<PaginatedResponse<TSalesOrder>>('/sales-orders/to-plan', {query: {page: 1, limit: 1}, signal})).total)
+    const fetchTransportCount = (status: Status, signal?: AbortSignal) => task(async () =>
+        (await api.request<PaginatedResponse<TransportSummary>>('/transport-orders', {query: {page: 1, limit: 1, status}, signal})).total)
+    const fetchRecentPage = (page: number, signal?: AbortSignal) => task(() =>
+        api.request<PaginatedResponse<TransportSummary>>('/transport-orders', {query: {page, limit: 100}, signal}))
+
+    function beginLoad() { batchLoading.value = true; error.value = '' }
+    function finishLoad(total: number, statuses: number[], records: TransportSummary[]) {
+        unplanned.value = total
+        counts.value = statuses
+        recent.value = records.sort((a, b) => Number(b.no.slice(3)) - Number(a.no.slice(3))).slice(0, 5)
+        dirty.value = false
+        batchLoading.value = false
+    }
+    function failLoad(cause: unknown) { error.value = errorMessage(cause); batchLoading.value = false }
+    function cancelLoad() { batchLoading.value = false }
+    function invalidate() { dirty.value = true }
+    return {unplanned, counts, recent, loading, error, dirty, fetchUnplannedCount, fetchTransportCount, fetchRecentPage,
+        beginLoad, finishLoad, failLoad, cancelLoad, invalidate}
 })

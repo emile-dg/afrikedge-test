@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import {onMounted, ref} from 'vue'
+import {ref} from 'vue'
 import {RouterLink, useRouter} from 'vue-router'
+import {useTransportList} from '@/composables/useTransportList'
 import {useTransportOrdersStore} from '@/stores/transport-orders'
 import {useCurrentUserStore} from '@/stores/current-user'
 import {formatDate, weight} from '@/utils/format'
@@ -25,7 +26,7 @@ const columns = [
 ]
 const statuses = [{value: '', label: 'Tous les statuts'}, {value: '0', label: 'Brouillon'}, {value: '1', label: 'Validé'}, {value: '2', label: 'Parti'}]
 function created(no: string) { void router.push('/transport-orders/' + encodeURIComponent(no)) }
-onMounted(() => { void transports.load() })
+const {reload} = useTransportList()
 </script>
 
 <template>
@@ -47,7 +48,7 @@ onMounted(() => { void transports.load() })
         </div>
         <UiCard>
             <UiTable :rows="transports.result.data" :columns="columns" :loading="transports.loading" :error="transports.error"
-                empty-text="Aucun transport ne correspond aux filtres." label="Ordres de transport" @retry="transports.load">
+                empty-text="Aucun transport ne correspond aux filtres." label="Ordres de transport" @retry="reload">
                 <template #cell-no="{row}"><RouterLink class="font-medium text-emerald-800 hover:underline" :to="'/transport-orders/' + row.no">{{ row.no }}</RouterLink></template>
                 <template #cell-deliveryDate="{row}"><span class="whitespace-nowrap">{{ formatDate(row.deliveryDate) }}</span></template>
                 <template #cell-status="{row}"><UiBadge :status="row.status" /></template>

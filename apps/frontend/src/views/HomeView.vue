@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import {computed, onMounted, ref} from 'vue'
+import {computed, ref} from 'vue'
 import {RouterLink, useRouter} from 'vue-router'
+import {useOverview} from '@/composables/useOverview'
 import {useOverviewStore} from '@/stores/overview'
 import {useCurrentUserStore} from '@/stores/current-user'
 import {formatDate, weight} from '@/utils/format'
@@ -23,7 +24,7 @@ const cards = computed(() => [
 ])
 const columns = [{key: 'no', label: 'Transport'}, {key: 'vehicleCode', label: 'Véhicule'}, {key: 'deliveryDate', label: 'Livraison'}, {key: 'status', label: 'Statut'}, {key: 'totalWeightKg', label: 'Poids', align: 'right' as const}]
 function created(no: string) { void router.push('/transport-orders/' + encodeURIComponent(no)) }
-onMounted(() => { void overview.load() })
+const {reload} = useOverview()
 </script>
 
 <template>
@@ -36,7 +37,7 @@ onMounted(() => { void overview.load() })
             </div>
             <UiButton v-if="user.can('transport-orders:create')" @click="createOpen = true">+ Nouveau transport</UiButton>
         </div>
-        <UiAlert v-if="overview.error">{{ overview.error }} <UiButton variant="ghost" size="sm" @click="overview.load">Réessayer</UiButton></UiAlert>
+        <UiAlert v-if="overview.error">{{ overview.error }} <UiButton variant="ghost" size="sm" @click="reload">Réessayer</UiButton></UiAlert>
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <RouterLink v-for="card in cards" :key="card.label" :to="card.to" class="rounded-xl border border-slate-200 bg-white p-5 transition-colors hover:border-emerald-400">
                 <p class="text-xs leading-5 text-slate-500">{{ card.label }}</p>
@@ -54,7 +55,7 @@ onMounted(() => { void overview.load() })
                     <RouterLink class="text-xs font-medium text-emerald-700 hover:underline" to="/transport-orders">Tout voir →</RouterLink>
                 </div>
             </template>
-            <UiTable :rows="overview.recent" :columns="columns" :loading="overview.loading" :error="overview.error" empty-text="Aucun transport créé." label="Derniers transports" @retry="overview.load">
+            <UiTable :rows="overview.recent" :columns="columns" :loading="overview.loading" :error="overview.error" empty-text="Aucun transport créé." label="Derniers transports" @retry="reload">
                 <template #cell-no="{row}">
                     <RouterLink class="font-medium text-emerald-800 hover:underline" :to="'/transport-orders/' + row.no">{{ row.no }}</RouterLink>
                 </template>

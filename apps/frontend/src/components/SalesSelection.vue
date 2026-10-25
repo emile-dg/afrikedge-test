@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {onMounted} from 'vue'
+import {useSalesPlanning} from '@/composables/useSalesPlanning'
 import {useSalesOrdersStore} from '@/stores/sales-orders'
 import {weight} from '@/utils/format'
 import UiButton from './UiButton.vue'
@@ -15,9 +15,8 @@ const columns = [
     {key: 'deliveryCity', label: 'Ville de livraison'},
     {key: 'totalWeightKg', label: 'Poids', align: 'right' as const},
 ]
-onMounted(() => {
-    void sales.load()
-})
+const {reload} = useSalesPlanning()
+defineExpose({reload})
 </script>
 
 <template>
@@ -50,7 +49,7 @@ onMounted(() => {
             <UiTable :rows="sales.result.data" :columns="columns" selectable :selected="sales.selectedIds"
                      :loading="sales.loading" :error="sales.error"
                      empty-text="Aucune commande à planifier pour cette ville."
-                     label="Commandes à planifier" @update:selected="sales.select" @retry="sales.load">
+                     label="Commandes à planifier" @update:selected="sales.select" @retry="reload">
                 <template #cell-no="{row}"><span class="font-medium text-slate-900">{{ row.no }}</span></template>
                 <template #cell-customerName="{row}">
                     <span class="block whitespace-nowrap text-slate-700">{{ row.customerName }}</span>

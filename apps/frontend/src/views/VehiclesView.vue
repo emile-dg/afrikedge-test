@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import {onMounted} from 'vue'
+import {useVehicleData} from '@/composables/useVehicleData'
 import {useVehiclesStore} from '@/stores/vehicles'
 import {weight} from '@/utils/format'
 import UiCard from '@/components/UiCard.vue'
 import UiTable from '@/components/UiTable.vue'
 const fleet = useVehiclesStore()
 const columns = [{key: 'code', label: 'Véhicule'}, {key: 'plateNo', label: 'Immatriculation'}, {key: 'capacityKg', label: 'Capacité', align: 'right' as const}]
-onMounted(() => { void fleet.load() })
+const {reload} = useVehicleData()
 </script>
 
 <template>
@@ -18,7 +18,7 @@ onMounted(() => { void fleet.load() })
         </div>
         <UiCard>
             <UiTable :rows="fleet.vehicles" :columns="columns" row-key="code" :loading="fleet.loading" :error="fleet.error"
-                empty-text="Aucun véhicule actif disponible." label="Véhicules actifs" @retry="fleet.load">
+                empty-text="Aucun véhicule actif disponible." label="Véhicules actifs" @retry="reload">
                 <template #cell-code="{row}"><span class="font-medium text-slate-900">{{ row.code }}</span></template>
                 <template #cell-capacityKg="{row}">{{ weight(row.capacityKg) }}</template>
             </UiTable>

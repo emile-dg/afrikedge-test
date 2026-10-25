@@ -33,7 +33,6 @@ export interface TransportDetails extends TransportSummary {
 
 export interface SalesQuery extends PaginationQuery {
     status?: Status
-    city?: string
 }
 
 export interface TransportQuery extends PaginationQuery {
@@ -44,17 +43,4 @@ export interface TransportQuery extends PaginationQuery {
 export interface CreateTransport {
     vehicleCode: string
     deliveryDate: string
-}
-
-export interface PlanningApi {
-    listVehicles(userId: string): Promise<TVehicle[]>
-    listSalesOrders(query: SalesQuery, userId: string): Promise<PaginatedResponse<TSalesOrder>>
-    listCities(userId: string): Promise<string[]>
-    listTransportOrders(query: TransportQuery, userId: string): Promise<PaginatedResponse<TransportSummary>>
-    getTransportOrder(no: string, userId: string): Promise<TransportDetails>
-    createTransportOrder(input: CreateTransport, userId: string): Promise<TransportDetails>
-    addLines(no: string, salesOrderNos: string[], userId: string): Promise<TransportDetails>
-    removeLine(no: string, salesOrderNo: string, userId: string): Promise<void>
-    validateTransport(no: string, userId: string): Promise<TransportDetails>
-    departTransport(no: string, userId: string): Promise<TransportDetails>
 }

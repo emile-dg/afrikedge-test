@@ -10,12 +10,14 @@ import AssignTransportDialog from '@/components/AssignTransportDialog.vue'
 
 const sales = useSalesOrdersStore()
 const user = useCurrentUserStore()
+const salesSelection = ref<InstanceType<typeof SalesSelection>>()
 const assignOpen = ref(false)
 const assignedNo = ref('')
 
 function assigned(no: string) {
     assignedNo.value = no
     sales.clearSelection()
+    void salesSelection.value?.reload()
 }
 </script>
 
@@ -36,9 +38,9 @@ function assigned(no: string) {
             .
         </UiAlert>
 
-        <SalesSelection>
+        <SalesSelection ref="salesSelection">
             <template #actions>
-                <UiButton v-if="user.can('transport-orders:lines:add')" :disabled="!sales.selection.length"
+                <UiButton v-if="user.can('transport-orders:lines:add')" :disabled="sales.loading || !!sales.error || !sales.selection.length"
                           @click="assignOpen = true">Ajouter à un transport
                 </UiButton>
             </template>

@@ -5,12 +5,6 @@ export function todayDate(now = new Date()): string {
     return ['year', 'month', 'day'].map(type => parts.find(part => part.type === type)?.value).join('-')
 }
 
-export function offsetDate(date: string, days: number): string {
-    const value = new Date(date + 'T12:00:00Z')
-    value.setUTCDate(value.getUTCDate() + days)
-    return value.toISOString().slice(0, 10)
-}
-
 export function formatDate(date: string): string {
     return new Intl.DateTimeFormat('fr-FR', {day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC'})
         .format(new Date(date + 'T12:00:00Z'))

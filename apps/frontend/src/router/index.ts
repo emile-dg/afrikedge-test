@@ -1,3 +1,4 @@
+import {nextTick} from 'vue'
 import {createRouter, createWebHistory} from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
 import HomeView from '@/views/HomeView.vue'
@@ -16,7 +17,13 @@ const router = createRouter({
             {path: ':pathMatch(.*)*', name: 'not-found', component: () => import('@/views/NotFoundView.vue'), meta: {title: 'Page introuvable'}},
         ],
     }],
-    scrollBehavior: () => ({top: 0}),
+    scrollBehavior: async (to) => {
+        await nextTick()
+        const main = document.getElementById('main-content')
+        if (to.hash) document.getElementById(to.hash.slice(1))?.scrollIntoView()
+        else main?.scrollTo({top: 0, left: 0})
+        return false as const
+    },
 })
 router.afterEach(to => { document.title = String(to.meta.title ?? 'Accueil') + ' · AfrikEdge' })
 export default router
