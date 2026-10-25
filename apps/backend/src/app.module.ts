@@ -1,3 +1,4 @@
+import {AuthorizationModule} from './authorization/authorization.module';
 import {Module} from '@nestjs/common';
 import {ConfigModule} from '@nestjs/config';
 import {z} from 'zod';
@@ -20,6 +21,7 @@ const schema = z.object({
 @Module({
     imports: [
         ConfigModule.forRoot({isGlobal: true, validationSchema: schema}),
+        AuthorizationModule,
         VehiclesModule,
         SalesOrdersModule,
         TransportOrdersModule,

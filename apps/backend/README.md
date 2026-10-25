@@ -1,152 +1,103 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# AfrikEdge SEFS1026 backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS transport planning API using SQL Server 2022, parameterized mssql queries, and Zod.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Setup
 
-## Description
+Run commands from the repository root. Install dependencies with pnpm, copy apps/backend/.env.example to apps/backend/.env, and configure the SQL Server connection.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+    docker compose up -d
+    pnpm --filter backend dev
 
-## Project setup
+Initialize an empty assessment database using the instructions in docker-compose.yml. The supplied init.sql drops and recreates TransportPlanning; do not rerun it against data you need to retain.
 
-```bash
-$ pnpm install
-```
+The API defaults to http://localhost:3000. Configure PORT, CORS_ORIGIN, and DB_* settings in apps/backend/.env. Environment values are validated at startup; the pool closes on shutdown.
 
-## Compile and run the project
+## Simulated identity and permissions
 
-```bash
-# development
-$ pnpm run start
+Every feature request requires X-User-Id. This is an assessment identity simulation, not real authentication.
 
-# watch mode
-$ pnpm run start:dev
+| ID | Role |
+|---|---|
+| diane | DISPATCHER |
+| eric | LOGISTICS_MANAGER |
 
-# production mode
-$ pnpm run start:prod
-```
+IDs are case-sensitive; surrounding whitespace is trimmed. Missing, malformed, or unknown identities receive 401. Insufficient permission receives 403. Routes without permission metadata are denied. The registry, permissions, and role policies are centralized in src/authorization.
 
-## Run tests
+| Method | Endpoint | Permission |
+|---|---|---|
+| GET | /vehicles | vehicles:read |
+| GET | /sales-orders | sales-orders:read |
+| GET | /sales-orders/to-plan | sales-orders:read |
+| GET | /transport-orders | transport-orders:read |
+| GET | /transport-orders/:no | transport-orders:read |
+| POST | /transport-orders | transport-orders:create |
+| POST | /transport-orders/:no/lines | transport-orders:lines:add |
+| DELETE | /transport-orders/:no/lines/:salesOrderNo | transport-orders:lines:remove |
+| POST | /transport-orders/:no/validate | transport-orders:validate |
+| POST | /transport-orders/:no/depart | transport-orders:depart |
 
-```bash
-# unit tests
-$ pnpm run test
+Both roles have every listed permission except transport-orders:validate, which belongs only to LOGISTICS_MANAGER. Creator and validator fields use the resolved registry ID.
 
-# e2e tests
-$ pnpm run test:e2e
+## Contracts
 
-# test coverage
-$ pnpm run test:cov
-```
+Sales-order and transport-order lists accept page and limit. Defaults are page=1 and limit=100. The maximum limit is 100; values must be positive integers and the calculated offset must fit a SQL Server int.
 
-## Deployment
+    { "data": [], "total": 0, "page": 1, "limit": 100, "totalPages": 0 }
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it
-runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more
-information.
+Totals include every matching item even when the requested page is empty. Lists are ordered by record number. Count and page queries retain read-committed semantics and do not promise a snapshot across concurrent changes.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check
-out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment
-straightforward and fast, requiring just a few simple steps:
+Sales lists accept optional status=0, 1, or 2. The to-plan route always selects status 0. Items use no, customerNo, customerName, deliveryCity, totalWeightKg, and status. Weights are JSON numbers.
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
+Transport lists accept optional status=0, 1, or 2 and date=YYYY-MM-DD, independently or together. Creation accepts:
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than
-managing infrastructure.
+    { "vehicleCode": "VH-01", "deliveryDate": "2099-01-01" }
 
-## Observability
+Assignments accept:
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues
-early, and maintaining reliable performance.
+    { "salesOrderNos": ["SO-1008", "SO-1009"] }
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep
-visibility into your system with minimal setup:
+Dates are date-only values; today is calculated in Africa/Douala. Identifiers are trimmed nonempty strings of at most 20 characters. Creation and assignment bodies reject unknown fields. Assignment arrays must be nonempty and have no duplicate IDs.
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need
-  optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding
-  defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies
-  so your team can react quickly.
+Creation returns 201; other successful POST operations return 200. Removal returns 204 with no body. Vehicles return an array. Transport details include vehicle registration/capacity, assigned sales orders, total weight, and remaining capacity.
 
-To add it to this project, run this and approve the code it prints
-at [observe.nestjs.com/link](https://observe.nestjs.com/link) - signing up for free if you have no account:
+## Consistency and errors
 
-```bash
-$ npx @nestjs/observe link
-```
+Creation requires an existing active vehicle, a non-past date, and a unique vehicle/date schedule across every transport status. Assignments require unplanned, unassigned sales orders and a Draft transport. Capacity includes existing and incoming weights and permits equality.
 
-It installs `@nestjs/observe`, wires it into `AppModule` and `main.ts`, and writes the app key and secret into `.env`,
-which every `nest start` script (`start`, `start:dev`, `start:debug`) then loads. In production, set `OBSERVE_APP_KEY`
-and `OBSERVE_APP_SECRET` in the environment instead.
+Line changes and sales-status updates are atomic. Validation requires manager permission and a nonempty Draft transport. Departure requires Validated status and changes all assigned sales orders to In Delivery atomically. Validated and Departed transports reject line edits.
 
-Or do it by hand:
+Transport mutations and standalone detail reads acquire the same transaction-owned application lock. Mutations use SERIALIZABLE with UPDLOCK/HOLDLOCK and transaction-bound requests, including number generation. This intentionally serializes transport workflows for the assessment. External ERP writers must honor compatible invariants. The supplied schema is unchanged.
 
-```bash
-$ pnpm install @nestjs/observe
-```
+| HTTP status | Meaning |
+|---|---|
+| 400 | Invalid request, query, identifier, date, or array |
+| 401 | Missing, malformed, or unknown identity |
+| 403 | Missing required permission |
+| 404 | Missing record or line membership |
+| 409 | Assignment, capacity, schedule, state, duplicate-key, or lock-contention conflict |
+| 503 | Database connection unavailable or request timeout |
+| 500 | Unexpected database failure |
 
-Then follow the [setup guide](https://docs.nestjs.com/observability/sdk) - it takes a single import and an app key.
+Database internals are logged and excluded from API messages. Existing domain HTTP errors retain their status and message.
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse
-the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data,
-with nothing to install.
+## Verification
 
-## Resources
+    pnpm --filter backend build
+    pnpm --filter backend type-check
+    pnpm --filter backend lint
+    pnpm --filter backend test
+    pnpm --filter backend test:e2e
 
-Check out a few resources that may come in handy when working with NestJS:
+Unit and HTTP suites use mocks and require no database. The HTTP suite covers both roles on all ten routes, denied identities, validation, status codes, and resolved-user persistence. Use these backend commands; the root workspace test script is still a starter placeholder.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and
-  logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time
-  using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our
-  official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework)
-  and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+The optional real-SQL suite requires INTEGRATION_DB_NAME explicitly selecting an initialized assessment database. Other DB_* settings come from the environment or apps/backend/.env.
 
-## Support
+PowerShell:
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If
-you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+    $env:INTEGRATION_DB_NAME = 'TransportPlanning'
+    pnpm --filter backend test:integration
 
-## Stay in touch
+Without INTEGRATION_DB_NAME the SQL suite is skipped. It creates uniquely named disposable vehicle, sales-order, and transport records and removes them in teardown. It never invokes init.sql. Use an assessment database, not production. An interrupted process may require manual cleanup of its QA-prefixed fixtures.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+SQL checks cover rollback after partial assignment/removal/departure writes, concurrent scheduling/numbering/assignment/capacity protection, exact capacity, validation/edit races, consistent detail reads, and sales-status synchronization.

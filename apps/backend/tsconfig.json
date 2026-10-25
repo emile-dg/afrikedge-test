@@ -3,7 +3,7 @@
     "compilerOptions": {
         "module": "commonjs",
         "target": "ES2022",
-        "rootDir": "src",
+        "rootDir": ".",
         "outDir": "dist",
         "strict": true,
         "sourceMap": true,
@@ -11,5 +11,18 @@
         "emitDecoratorMetadata": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
+        "types": [
+            "node",
+            "vitest/globals"
+        ]
     },
+    "include": [
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "vitest*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
 }

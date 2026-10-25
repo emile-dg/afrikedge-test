@@ -2,7 +2,7 @@ import {Injectable} from '@nestjs/common';
 import * as sql from 'mssql';
 import {DatabaseService} from "../database/database.service";
 import {SalesOrderStatus} from "./sales_orders.types";
-import {PaginatedResponse, TSalesOrder} from "@shared/types";
+import type {PaginatedResponse, TSalesOrder} from "@shared/types";
 
 @Injectable()
 export class SalesOrdersRepository {
@@ -24,7 +24,7 @@ export class SalesOrdersRepository {
             FROM [Sales Order]
             WHERE (@status IS NULL OR [Status] = @status);
 
-            SELECT [No_] as no, [Customer No_] as customer_no, [Customer Name] as Customer_name, [Delivery City] as delivery_city, [Total Weight (Kg)] as total_weight_kg, [Status] as status
+            SELECT [No_] as no, [Customer No_] AS customerNo, [Customer Name] AS customerName, [Delivery City] AS deliveryCity, [Total Weight (Kg)] AS totalWeightKg, [Status] as status
             FROM "Sales Order"
             WHERE (@status IS NULL OR [Status] = @status)
             ORDER BY [No_]

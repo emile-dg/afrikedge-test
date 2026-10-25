@@ -1,4 +1,5 @@
-import {BadRequestException, ConflictException, Injectable, NotFoundException} from '@nestjs/common';
+import {BadRequestException, ConflictException, Injectable, Logger, NotFoundException} from '@nestjs/common';
+import {throwDatabaseError} from '../database/database-errors';
 import * as sql from 'mssql';
 import {TransportOrdersRepository} from './transport-orders.repository';
 import {TransportOrderStatus} from './transport-orders.types';
@@ -7,14 +8,20 @@ import {SalesOrderStatus} from '../sales_orders/sales_orders.types';
 
 @Injectable()
 export class TransportOrdersService {
+    private readonly logger = new Logger(TransportOrdersService.name);
     constructor(private readonly repository: TransportOrdersRepository) {
     }
 
-    findAll(query: TransportOrderQuery) {
-        return this.repository.findAll(query);
+    async findAll(query: TransportOrderQuery) {
+        try {
+            return await this.repository.findAll(query);
+        } catch (error) {
+            throwDatabaseError(error, this.logger);
+        }
     }
 
     async findOne(no: string, transaction?: sql.Transaction): Promise<TransportOrderDetails> {
+        if (!transaction) return this.withTransportTransaction((context) => this.findOne(no, context));
         const transport = await this.repository.findOne(no, transaction);
         if (!transport) throw new NotFoundException('Transport order ' + no + ' does not exist');
         return transport;
@@ -26,12 +33,15 @@ export class TransportOrdersService {
         }
     }
 
-    private async mutate<T>(operation: (transaction: sql.Transaction) => Promise<T>): Promise<T> {
-        const transaction = this.repository.createTransaction();
+    private async withTransportTransaction<T>(operation: (transaction: sql.Transaction) => Promise<T>): Promise<T> {
+        let transaction: sql.Transaction | undefined;
+        let started = false;
         let rolledBack = false;
-        transaction.on('rollback', () => { rolledBack = true; });
-        await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
         try {
+            transaction = this.repository.createTransaction();
+            transaction.on('rollback', () => { rolledBack = true; });
+            await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+            started = true;
             if (!await this.repository.lockMutations(transaction)) {
                 throw new ConflictException('Transport orders are being modified; retry the request');
             }
@@ -39,16 +49,20 @@ export class TransportOrdersService {
             await transaction.commit();
             return result;
         } catch (error) {
-            if (!rolledBack) await transaction.rollback().catch(() => undefined);
-            if (error instanceof sql.RequestError && (error.number === 1205 || error.number === 1222)) {
-                throw new ConflictException('Concurrent transport modification; retry the request');
+            if (transaction && started && !rolledBack) {
+                try {
+                    await transaction.rollback();
+                } catch (rollbackError) {
+                    this.logger.error('Transport transaction rollback failed',
+                        rollbackError instanceof Error ? rollbackError.stack : undefined);
+                }
             }
-            throw error;
+            throwDatabaseError(error, this.logger);
         }
     }
 
     create(input: CreateTransportOrder, userId: string): Promise<TransportOrderDetails> {
-        return this.mutate(async (transaction) => {
+        return this.withTransportTransaction(async (transaction) => {
             const parts = new Intl.DateTimeFormat('en-US', {
                 timeZone: 'Africa/Douala', year: 'numeric', month: '2-digit', day: '2-digit',
             }).formatToParts(new Date());
@@ -72,7 +86,7 @@ export class TransportOrdersService {
         if (salesOrderNos.length === 0 || new Set(salesOrderNos).size !== salesOrderNos.length) {
             throw new BadRequestException('Supply at least one sales order without duplicate numbers');
         }
-        return this.mutate(async (transaction) => {
+        return this.withTransportTransaction(async (transaction) => {
             const transport = await this.findOne(no, transaction);
             this.requireStatus(transport, TransportOrderStatus.Draft);
             let weight = Math.round(transport.totalWeightKg * 100);
@@ -96,7 +110,7 @@ export class TransportOrdersService {
     }
 
     removeLine(no: string, salesOrderNo: string): Promise<void> {
-        return this.mutate(async (transaction) => {
+        return this.withTransportTransaction(async (transaction) => {
             const transport = await this.findOne(no, transaction);
             this.requireStatus(transport, TransportOrderStatus.Draft);
             const order = await this.repository.findSalesOrder(salesOrderNo, transaction);
@@ -108,7 +122,7 @@ export class TransportOrdersService {
     }
 
     validate(no: string, userId: string): Promise<TransportOrderDetails> {
-        return this.mutate(async (transaction) => {
+        return this.withTransportTransaction(async (transaction) => {
             const transport = await this.findOne(no, transaction);
             this.requireStatus(transport, TransportOrderStatus.Draft);
             if (transport.salesOrders.length === 0) {
@@ -120,7 +134,7 @@ export class TransportOrdersService {
     }
 
     depart(no: string): Promise<TransportOrderDetails> {
-        return this.mutate(async (transaction) => {
+        return this.withTransportTransaction(async (transaction) => {
             const transport = await this.findOne(no, transaction);
             this.requireStatus(transport, TransportOrderStatus.Validated);
             await this.repository.depart(no, transaction);

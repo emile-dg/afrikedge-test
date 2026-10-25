@@ -5,6 +5,7 @@ export default defineConfig({
     test: {
         globals: true,
         root: './',
+        exclude: ['**/node_modules/**', '**/dist/**', '**/*.integration.e2e-spec.ts'],
         include: ['**/*.e2e-spec.ts'],
     },
 });

@@ -1,9 +1,9 @@
 export type TSalesOrder = {
     no: string
-    customer_no: string
-    Customer_name: string
-    delivery_city: string
-    total_weight_kg: string
+    customerNo: string
+    customerName: string
+    deliveryCity: string
+    totalWeightKg: number
     status: number
 }
 
